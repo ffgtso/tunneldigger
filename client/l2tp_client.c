@@ -1133,8 +1133,9 @@ void context_process(l2tp_context *ctx)
           return;
         } else {
           if (connect(ctx->fd, result->ai_addr, result->ai_addrlen) < 0) {
-            syslog(LOG_ERR, "[%s:%s] Failed to connect to remote endpoint - check WAN connectivity!",
-              ctx->broker_hostname, ctx->broker_port);
+            struct sockaddr_in* tmp_addr = (struct sockaddr_in*) result->ai_addr;
+            syslog(LOG_ERR, "[%s:%s] Failed to connect to remote endpoint at %s - check WAN connectivity!",
+              ctx->broker_hostname, ctx->broker_port, inet_ntoa(tmp_addr->sin_addr));
             ctx->state = STATE_REINIT;
           } else {
             ctx->state = STATE_GET_USAGE;
@@ -1331,6 +1332,8 @@ void show_help(const char *app)
     "       -a            select broker based on use\n"
     "       -g            select first available broker to connect to (default)\n"
     "       -r            select a random broker\n"
+    "\n"
+    "Test-/Debugversion, wusel+src@uu.org\n"
   );
 }
 
@@ -1462,6 +1465,7 @@ int main(int argc, char **argv)
     }
 
     syslog(LOG_INFO, "Performing broker selection...");
+    syslog(LOG_INFO, "Configured brokers: %d", broker_cnt);
 
     // Reset availability information and standby setting.
     for (i = 0; i < broker_cnt; i++) {
@@ -1541,6 +1545,8 @@ int main(int argc, char **argv)
       // the only possible transition is to STATE_FAILED.  But let's play safe.
       if (timer_establish < 0 && main_context->state != STATE_KEEPALIVE) {
         timer_establish = timer_now();
+        syslog(LOG_ERR, "Impossible situation with [%s:%s], check comment before %s, line %d.",
+          main_context->broker_hostname, main_context->broker_port, __FILE__, __LINE__);
       }
 
       // After 15 seconds, we check if the tunnel has been established.
