@@ -1101,8 +1101,7 @@ void context_process(l2tp_context *ctx)
   // Transmit packets if needed.
   switch (ctx->state) {
     case STATE_REINIT: {
-      syslog(LOG_INFO, "[%s:%s] Broker is in STATE_REINIT ...",
-        ctx->broker_hostname, ctx->broker_port);
+      syslog(LOG_INFO, "[%s:%s] Broker is in STATE_REINIT.", ctx->broker_hostname, ctx->broker_port);
       if (is_timeout(&ctx->timer_reinit, 2)) {
         syslog(LOG_INFO, "[%s:%s] Reinitializing tunnel context.",
           ctx->broker_hostname, ctx->broker_port);
@@ -1116,8 +1115,7 @@ void context_process(l2tp_context *ctx)
       // Deliberate fall-through to STATE_RESOLVING
     }
     case STATE_RESOLVING: {
-      syslog(LOG_INFO, "[%s:%s] Broker is in STATE_RESOLVING ...",
-        ctx->broker_hostname, ctx->broker_port);
+      /* syslog(LOG_INFO, "[%s:%s] Broker is in STATE_RESOLVING ...", ctx->broker_hostname, ctx->broker_port); */
       if (ctx->broker_resq == NULL) {
         syslog(LOG_INFO, "[%s:%s] Broker's IP hasn't been resolved yet.",
           ctx->broker_hostname, ctx->broker_port);
@@ -1169,38 +1167,37 @@ void context_process(l2tp_context *ctx)
       }
     }
     case STATE_GET_USAGE: {
-      syslog(LOG_INFO, "[%s:%s] Broker is in STATE_GET_USAGE ...",
-        ctx->broker_hostname, ctx->broker_port);
       if (ctx->timer_usage == 0) {
         // The initial request.  We only ask for usage.
+        syslog(LOG_INFO, "[%s:%s] Broker is in STATE_GET_USAGE, send initial request.", ctx->broker_hostname, ctx->broker_port);
         context_send_usage_request(ctx);
         ctx->timer_usage = timer_now();
       } else if (is_timeout(&ctx->timer_usage, 2)) {
         // *Not* the initial request.  Also ask for cookie, to provide compatibility with old brokers.
+        syslog(LOG_INFO, "[%s:%s] Broker is in STATE_GET_USAGE, get cookie.", ctx->broker_hostname, ctx->broker_port);
         context_send_usage_request(ctx);
         context_send_packet(ctx, CONTROL_TYPE_COOKIE, "XXXXXXXX", 8);
       }
       break;
     }
     case STATE_GET_COOKIE: {
-      syslog(LOG_INFO, "[%s:%s] Broker is in STATE_GET_COOKIE ...",
-        ctx->broker_hostname, ctx->broker_port);
       // Send request for a tasty cookie.
-      if (is_timeout(&ctx->timer_cookie, 2))
+      if (is_timeout(&ctx->timer_cookie, 2)) {
+        syslog(LOG_INFO, "[%s:%s] Broker is in STATE_GET_COOKIE, asking for some ...", ctx->broker_hostname, ctx->broker_port);
         context_send_packet(ctx, CONTROL_TYPE_COOKIE, "XXXXXXXX", 8);
+      }
       break;
     }
     case STATE_GET_TUNNEL: {
-      syslog(LOG_INFO, "[%s:%s] Broker is in STATE_GET_TUNNEL ...",
-        ctx->broker_hostname, ctx->broker_port);
       // Send tunnel setup request.
-      if (is_timeout(&ctx->timer_tunnel, 2))
+      if (is_timeout(&ctx->timer_tunnel, 2)) {
+        syslog(LOG_INFO, "[%s:%s] Broker is in STATE_GET_TUNNEL, sending request.", ctx->broker_hostname, ctx->broker_port);
         context_send_setup_request(ctx);
+      }
       break;
     }
     case STATE_KEEPALIVE: {
-      syslog(LOG_INFO, "[%s:%s] Broker is in STATE_KEEPALIVE ...",
-        ctx->broker_hostname, ctx->broker_port);
+      /* syslog(LOG_INFO, "[%s:%s] Broker is in STATE_KEEPALIVE ...", ctx->broker_hostname, ctx->broker_port); */
       // Send periodic keepalive messages.
       // The sequence number is needed because some ISP (usually cable or mobile operators)
       // do some "optimisation" and drop udp packets containing the same content.
@@ -1279,11 +1276,10 @@ void context_process(l2tp_context *ctx)
       break;
     }
     case STATE_STANBDY:
-      syslog(LOG_INFO, "[%s:%s] Broker is in STATE_STANDBY (NO-OP) ...",
-        ctx->broker_hostname, ctx->broker_port);
+      syslog(LOG_INFO, "[%s:%s] Broker is in STATE_STANDBY.", ctx->broker_hostname, ctx->broker_port);
+      break; /* -wusel, 2022-07-20: added to distinguish between STANDBY & FAILED */
     case STATE_FAILED: {
-      syslog(LOG_INFO, "[%s:%s] Broker is in STATE_FAILED ...",
-        ctx->broker_hostname, ctx->broker_port);
+      syslog(LOG_INFO, "[%s:%s] Broker is in STATE_FAILED.", ctx->broker_hostname, ctx->broker_port);
       break;
     }
   }
