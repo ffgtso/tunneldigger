@@ -1101,9 +1101,9 @@ void context_process(l2tp_context *ctx)
   // Transmit packets if needed.
   switch (ctx->state) {
     case STATE_REINIT: {
-      syslog(LOG_INFO, "[%s:%s] Broker is in STATE_REINIT.", ctx->broker_hostname, ctx->broker_port);
+      syslog(LOG_DEBUG, "[%s:%s] Broker is in STATE_REINIT.", ctx->broker_hostname, ctx->broker_port);
       if (is_timeout(&ctx->timer_reinit, 2)) {
-        syslog(LOG_INFO, "[%s:%s] Reinitializing tunnel context.",
+        syslog(LOG_DEBUG, "[%s:%s] Reinitializing tunnel context.",
           ctx->broker_hostname, ctx->broker_port);
         if (context_reinitialize(ctx) < 0) {
           syslog(LOG_ERR, "[%s:%s] Unable to reinitialize the context!",
@@ -1115,9 +1115,9 @@ void context_process(l2tp_context *ctx)
       // Deliberate fall-through to STATE_RESOLVING
     }
     case STATE_RESOLVING: {
-      /* syslog(LOG_INFO, "[%s:%s] Broker is in STATE_RESOLVING ...", ctx->broker_hostname, ctx->broker_port); */
+      /* syslog(LOG_DEBUG, "[%s:%s] Broker is in STATE_RESOLVING ...", ctx->broker_hostname, ctx->broker_port); */
       if (ctx->broker_resq == NULL) {
-        syslog(LOG_INFO, "[%s:%s] Broker's IP hasn't been resolved yet.",
+        syslog(LOG_DEBUG, "[%s:%s] Broker's IP hasn't been resolved yet.",
           ctx->broker_hostname, ctx->broker_port);
         context_start_connect(ctx);
       }
@@ -1137,14 +1137,14 @@ void context_process(l2tp_context *ctx)
           ctx->state = STATE_REINIT;
           return;
         } else {
-         struct sockaddr_in* tmp_addr = (struct sockaddr_in*) result->ai_addr;
-         if (connect(ctx->fd, result->ai_addr, result->ai_addrlen) < 0) {
+          struct sockaddr_in* tmp_addr = (struct sockaddr_in*) result->ai_addr;
+          syslog(LOG_DEBUG, "[%s:%s] Broker's FQDN has been resolved to %s.",
+            ctx->broker_hostname, ctx->broker_port, inet_ntoa(tmp_addr->sin_addr));
+          if (connect(ctx->fd, result->ai_addr, result->ai_addrlen) < 0) {
             syslog(LOG_ERR, "[%s:%s] Failed to connect to remote endpoint at %s - check WAN connectivity!",
               ctx->broker_hostname, ctx->broker_port, inet_ntoa(tmp_addr->sin_addr));
             ctx->state = STATE_REINIT;
           } else {
-            syslog(LOG_INFO, "[%s:%s] Connected to remote endpoint at %s.",
-              ctx->broker_hostname, ctx->broker_port, inet_ntoa(tmp_addr->sin_addr));
             ctx->state = STATE_GET_USAGE;
           }
           asyncns_freeaddrinfo(result);
@@ -1169,12 +1169,14 @@ void context_process(l2tp_context *ctx)
     case STATE_GET_USAGE: {
       if (ctx->timer_usage == 0) {
         // The initial request.  We only ask for usage.
-        syslog(LOG_INFO, "[%s:%s] Broker is in STATE_GET_USAGE, send initial request.", ctx->broker_hostname, ctx->broker_port);
+        syslog(LOG_DEBUG, "[%s:%s] Broker is in STATE_GET_USAGE, sending initial request.",
+          ctx->broker_hostname, ctx->broker_port);
         context_send_usage_request(ctx);
         ctx->timer_usage = timer_now();
       } else if (is_timeout(&ctx->timer_usage, 2)) {
         // *Not* the initial request.  Also ask for cookie, to provide compatibility with old brokers.
-        syslog(LOG_INFO, "[%s:%s] Broker is in STATE_GET_USAGE, get cookie.", ctx->broker_hostname, ctx->broker_port);
+        syslog(LOG_DEBUG, "[%s:%s] Broker is in STATE_GET_USAGE, asking for cookie.",
+          ctx->broker_hostname, ctx->broker_port);
         context_send_usage_request(ctx);
         context_send_packet(ctx, CONTROL_TYPE_COOKIE, "XXXXXXXX", 8);
       }
@@ -1183,7 +1185,8 @@ void context_process(l2tp_context *ctx)
     case STATE_GET_COOKIE: {
       // Send request for a tasty cookie.
       if (is_timeout(&ctx->timer_cookie, 2)) {
-        syslog(LOG_INFO, "[%s:%s] Broker is in STATE_GET_COOKIE, asking for some ...", ctx->broker_hostname, ctx->broker_port);
+        syslog(LOG_DEBUG, "[%s:%s] Broker is in STATE_GET_COOKIE, asking for some ...",
+          ctx->broker_hostname, ctx->broker_port);
         context_send_packet(ctx, CONTROL_TYPE_COOKIE, "XXXXXXXX", 8);
       }
       break;
@@ -1191,13 +1194,14 @@ void context_process(l2tp_context *ctx)
     case STATE_GET_TUNNEL: {
       // Send tunnel setup request.
       if (is_timeout(&ctx->timer_tunnel, 2)) {
-        syslog(LOG_INFO, "[%s:%s] Broker is in STATE_GET_TUNNEL, sending request.", ctx->broker_hostname, ctx->broker_port);
+        syslog(LOG_DEBUG, "[%s:%s] Broker is in STATE_GET_TUNNEL, sending request.",
+          ctx->broker_hostname, ctx->broker_port);
         context_send_setup_request(ctx);
       }
       break;
     }
     case STATE_KEEPALIVE: {
-      /* syslog(LOG_INFO, "[%s:%s] Broker is in STATE_KEEPALIVE ...", ctx->broker_hostname, ctx->broker_port); */
+      /* syslog(LOG_DEBUG, "[%s:%s] Broker is in STATE_KEEPALIVE ...", ctx->broker_hostname, ctx->broker_port); */
       // Send periodic keepalive messages.
       // The sequence number is needed because some ISP (usually cable or mobile operators)
       // do some "optimisation" and drop udp packets containing the same content.
@@ -1276,10 +1280,10 @@ void context_process(l2tp_context *ctx)
       break;
     }
     case STATE_STANBDY:
-      syslog(LOG_INFO, "[%s:%s] Broker is in STATE_STANDBY.", ctx->broker_hostname, ctx->broker_port);
+      syslog(LOG_DEBUG, "[%s:%s] Broker is in STATE_STANDBY.", ctx->broker_hostname, ctx->broker_port);
       break; /* -wusel, 2022-07-20: added to distinguish between STANDBY & FAILED */
     case STATE_FAILED: {
-      syslog(LOG_INFO, "[%s:%s] Broker is in STATE_FAILED.", ctx->broker_hostname, ctx->broker_port);
+      syslog(LOG_DEBUG, "[%s:%s] Broker is in STATE_FAILED.", ctx->broker_hostname, ctx->broker_port);
       break;
     }
   }
@@ -1482,17 +1486,17 @@ int main(int argc, char **argv)
     }
 
     syslog(LOG_INFO, "Performing broker selection...");
-    syslog(LOG_INFO, "Configured brokers: %d", broker_cnt);
+    syslog(LOG_DEBUG, "Configured brokers: %d", broker_cnt);
 
     // Reset availability information and standby setting.
     for (i = 0; i < broker_cnt; i++) {
       if (brokers[i].broken) {
         // Inhibit hostname resolution and connect process.
-        syslog(LOG_INFO, "[%s:%s] Not trying broker again as it broke last time we tried.",
+        syslog(LOG_INFO, "[%s:%s] Will not try broker again as it broke last time we tried.",
           brokers[i].address, brokers[i].port);
         brokers[i].ctx->state = STATE_FAILED;
       } else {
-        syslog(LOG_INFO, "[%s:%s] Trying broker ...", brokers[i].address, brokers[i].port);
+        syslog(LOG_DEBUG, "[%s:%s] Broker not flagged as broken, that's good.", brokers[i].address, brokers[i].port);
       }
     }
 
@@ -1505,10 +1509,14 @@ int main(int argc, char **argv)
       ready_cnt = 0;
       broker_select(brokers, broker_cnt); // poll from all FDs
       for (i = 0; i < broker_cnt; i++) {
+        syslog(LOG_DEBUG, "[%s:%s] context_process(broker)", brokers[i].address, brokers[i].port);
         context_process(brokers[i].ctx);
       }
 
       for (i = 0; i < broker_cnt; i++) {
+        syslog(LOG_DEBUG, "[%s:%s] Broker is%s ready.",
+          brokers[i].address, brokers[i].port,
+          brokers[i].ctx->state == STATE_STANBDY ? "" : " NOT");
         ready_cnt += brokers[i].ctx->state == STATE_STANBDY ? 1 : 0;
       }
 
@@ -1541,7 +1549,7 @@ int main(int argc, char **argv)
     main_context->state = STATE_GET_COOKIE;
 
     // Initially, we mark this broker as broken.  We will remove this mark after establishing
-    // a connection.  We only want to consider a broker as broker if the initial connection fails;
+    // a connection.  We only want to consider a broker as broken if the initial connection fails;
     // disconnecting later (e.g. because the broker got restarted) is fine.
     brokers[i].broken = timer_now();
 
@@ -1564,7 +1572,7 @@ int main(int argc, char **argv)
       // the only possible transition is to STATE_FAILED.  But let's play safe.
       if (timer_establish < 0 && main_context->state != STATE_KEEPALIVE) {
         timer_establish = timer_now();
-        syslog(LOG_ERR, "Impossible situation with [%s:%s], check comment before %s, line %d.",
+        syslog(LOG_ERR, "[%s:%s] 'Impossible situation', check comment before %s, line %d.",
           main_context->broker_hostname, main_context->broker_port, __FILE__, __LINE__);
       }
 
