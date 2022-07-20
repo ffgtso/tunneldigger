@@ -1491,7 +1491,7 @@ int main(int argc, char **argv)
     }
 
     syslog(LOG_INFO, "Performing broker selection...");
-    syslog(LOG_DEBUG, "Brokers deemed working: %d", working_broker);
+    syslog(LOG_DEBUG, "Brokers deemed working: %d", working_brokers);
 
     syslog(LOG_DEBUG, "main loop -- Reset availability information and standby setting.");
     // Reset availability information and standby setting.
