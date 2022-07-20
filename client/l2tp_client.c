@@ -1101,6 +1101,8 @@ void context_process(l2tp_context *ctx)
   // Transmit packets if needed.
   switch (ctx->state) {
     case STATE_REINIT: {
+      syslog(LOG_INFO, "[%s:%s] Broker is in STATE_REINIT ...",
+        ctx->broker_hostname, ctx->broker_port);
       if (is_timeout(&ctx->timer_reinit, 2)) {
         syslog(LOG_INFO, "[%s:%s] Reinitializing tunnel context.",
           ctx->broker_hostname, ctx->broker_port);
@@ -1114,8 +1116,13 @@ void context_process(l2tp_context *ctx)
       // Deliberate fall-through to STATE_RESOLVING
     }
     case STATE_RESOLVING: {
-      if (ctx->broker_resq == NULL)
+      syslog(LOG_INFO, "[%s:%s] Broker is in STATE_RESOLVING ...",
+        ctx->broker_hostname, ctx->broker_port);
+      if (ctx->broker_resq == NULL) {
+        syslog(LOG_INFO, "[%s:%s] Broker's IP hasn't been resolved yet.",
+          ctx->broker_hostname, ctx->broker_port);
         context_start_connect(ctx);
+      }
 
       // Check if address has already been resolved and change state.
       if (ctx->broker_resq && asyncns_isdone(asyncns_context, ctx->broker_resq)) {
@@ -1132,12 +1139,14 @@ void context_process(l2tp_context *ctx)
           ctx->state = STATE_REINIT;
           return;
         } else {
-          if (connect(ctx->fd, result->ai_addr, result->ai_addrlen) < 0) {
-            struct sockaddr_in* tmp_addr = (struct sockaddr_in*) result->ai_addr;
+         struct sockaddr_in* tmp_addr = (struct sockaddr_in*) result->ai_addr;
+         if (connect(ctx->fd, result->ai_addr, result->ai_addrlen) < 0) {
             syslog(LOG_ERR, "[%s:%s] Failed to connect to remote endpoint at %s - check WAN connectivity!",
               ctx->broker_hostname, ctx->broker_port, inet_ntoa(tmp_addr->sin_addr));
             ctx->state = STATE_REINIT;
           } else {
+            syslog(LOG_INFO, "[%s:%s] Connected to remote endpoint at %s.",
+              ctx->broker_hostname, ctx->broker_port, inet_ntoa(tmp_addr->sin_addr));
             ctx->state = STATE_GET_USAGE;
           }
           asyncns_freeaddrinfo(result);
@@ -1160,6 +1169,8 @@ void context_process(l2tp_context *ctx)
       }
     }
     case STATE_GET_USAGE: {
+      syslog(LOG_INFO, "[%s:%s] Broker is in STATE_GET_USAGE ...",
+        ctx->broker_hostname, ctx->broker_port);
       if (ctx->timer_usage == 0) {
         // The initial request.  We only ask for usage.
         context_send_usage_request(ctx);
@@ -1172,18 +1183,24 @@ void context_process(l2tp_context *ctx)
       break;
     }
     case STATE_GET_COOKIE: {
+      syslog(LOG_INFO, "[%s:%s] Broker is in STATE_GET_COOKIE ...",
+        ctx->broker_hostname, ctx->broker_port);
       // Send request for a tasty cookie.
       if (is_timeout(&ctx->timer_cookie, 2))
         context_send_packet(ctx, CONTROL_TYPE_COOKIE, "XXXXXXXX", 8);
       break;
     }
     case STATE_GET_TUNNEL: {
+      syslog(LOG_INFO, "[%s:%s] Broker is in STATE_GET_TUNNEL ...",
+        ctx->broker_hostname, ctx->broker_port);
       // Send tunnel setup request.
       if (is_timeout(&ctx->timer_tunnel, 2))
         context_send_setup_request(ctx);
       break;
     }
     case STATE_KEEPALIVE: {
+      syslog(LOG_INFO, "[%s:%s] Broker is in STATE_KEEPALIVE ...",
+        ctx->broker_hostname, ctx->broker_port);
       // Send periodic keepalive messages.
       // The sequence number is needed because some ISP (usually cable or mobile operators)
       // do some "optimisation" and drop udp packets containing the same content.
@@ -1262,7 +1279,11 @@ void context_process(l2tp_context *ctx)
       break;
     }
     case STATE_STANBDY:
+      syslog(LOG_INFO, "[%s:%s] Broker is in STATE_STANDBY (NO-OP) ...",
+        ctx->broker_hostname, ctx->broker_port);
     case STATE_FAILED: {
+      syslog(LOG_INFO, "[%s:%s] Broker is in STATE_FAILED ...",
+        ctx->broker_hostname, ctx->broker_port);
       break;
     }
   }
@@ -1474,6 +1495,8 @@ int main(int argc, char **argv)
         syslog(LOG_INFO, "[%s:%s] Not trying broker again as it broke last time we tried.",
           brokers[i].address, brokers[i].port);
         brokers[i].ctx->state = STATE_FAILED;
+      } else {
+        syslog(LOG_INFO, "[%s:%s] Trying broker ...", brokers[i].address, brokers[i].port);
       }
     }
 
