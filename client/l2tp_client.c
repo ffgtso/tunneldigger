@@ -1117,7 +1117,7 @@ void context_process(l2tp_context *ctx)
     case STATE_RESOLVING: {
       /* syslog(LOG_DEBUG, "[%s:%s] Broker is in STATE_RESOLVING ...", ctx->broker_hostname, ctx->broker_port); */
       if (ctx->broker_resq == NULL) {
-        syslog(LOG_DEBUG, "[%s:%s] Broker's IP hasn't been resolved yet.",
+        syslog(LOG_DEBUG, "[%s:%s] Broker's FQDN hasn't been resolved to an IP yet.",
           ctx->broker_hostname, ctx->broker_port);
         context_start_connect(ctx);
       }
@@ -1472,22 +1472,28 @@ int main(int argc, char **argv)
     }
   }
 
+  syslog(LOG_DEBUG, "Configured brokers: %d", broker_cnt);
+  syslog(LOG_DEBUG, "Entering main loop");
   for (;;) {
     int working_brokers = 0;
     // Make sure all brokers are in sane state.
-    for (i = 0; i < broker_cnt; i++) {
+   syslog(LOG_DEBUG, "for(;;) -- context_reinitialize() for all brokers.");
+   for (i = 0; i < broker_cnt; i++) {
       context_reinitialize(brokers[i].ctx);
       if (brokers[i].broken && brokers[i].broken + 3600 < timer_now()) {
         // This one broke more than an hour ago, give it another chance.
-        brokers[i].broken = 0;
+       syslog(LOG_DEBUG, "[%s:%s] Broker was marked broken > 1h ago, cleaning flag.",
+         brokers[i].address, brokers[i].port);
+       brokers[i].broken = 0;
       }
       if (!brokers[i].broken)
         working_brokers += 1;
     }
 
     syslog(LOG_INFO, "Performing broker selection...");
-    syslog(LOG_DEBUG, "Configured brokers: %d", broker_cnt);
+    syslog(LOG_DEBUG, "Brokers deemed working: %d", working_broker);
 
+    syslog(LOG_DEBUG, "main loop -- Reset availability information and standby setting.");
     // Reset availability information and standby setting.
     for (i = 0; i < broker_cnt; i++) {
       if (brokers[i].broken) {
@@ -1496,10 +1502,12 @@ int main(int argc, char **argv)
           brokers[i].address, brokers[i].port);
         brokers[i].ctx->state = STATE_FAILED;
       } else {
-        syslog(LOG_DEBUG, "[%s:%s] Broker not flagged as broken, that's good.", brokers[i].address, brokers[i].port);
+        syslog(LOG_DEBUG, "[%s:%s] Broker not flagged as broken, that's good.",
+          brokers[i].address, brokers[i].port);
       }
     }
 
+    syslog(LOG_DEBUG, "main loop -- Perform broker processing for 10 seconds or until all brokers are ready.");
     // Perform broker processing for 10 seconds or until all brokers are ready
     // (whichever is shorter); since all contexts are in standby mode, all
     // available connections will be stuck in GET_COOKIE state.
@@ -1509,7 +1517,7 @@ int main(int argc, char **argv)
       ready_cnt = 0;
       broker_select(brokers, broker_cnt); // poll from all FDs
       for (i = 0; i < broker_cnt; i++) {
-        syslog(LOG_DEBUG, "[%s:%s] context_process(broker)", brokers[i].address, brokers[i].port);
+        syslog(LOG_DEBUG, "[%s:%s] context_process()", brokers[i].address, brokers[i].port);
         context_process(brokers[i].ctx);
       }
 
@@ -1528,6 +1536,7 @@ int main(int argc, char **argv)
         break;
     }
 
+    syslog(LOG_DEBUG, "main loop -- select_broker()");
     i = select_broker(brokers, broker_cnt, ready_cnt);
     if (i == -1) {
       syslog(LOG_ERR, "No suitable brokers found. Retrying in 5 seconds");
@@ -1545,6 +1554,7 @@ int main(int argc, char **argv)
     syslog(LOG_INFO, "Selected %s:%s as the best broker.", brokers[i].address,
       brokers[i].port);
 
+    syslog(LOG_DEBUG, "main loop -- activate selected broker");
     // Activate the broker.
     main_context->state = STATE_GET_COOKIE;
 
@@ -1553,6 +1563,7 @@ int main(int argc, char **argv)
     // disconnecting later (e.g. because the broker got restarted) is fine.
     brokers[i].broken = timer_now();
 
+    syslog(LOG_DEBUG, "main loop -- Perform processing on the main context ...");
     // Perform processing on the main context; if the connection fails and does
     // not recover after 15 seconds, restart the broker selection process.
     time_t timer_establish = timer_now();
@@ -1585,6 +1596,8 @@ int main(int argc, char **argv)
           break;
         }
 
+        syslog(LOG_DEBUG, "main loop -- connection established, broker [%s:%s] is fine.",
+          main_context->broker_hostname, main_context->broker_port);
         // We successfully established a connection, this broker is fine.
         brokers[i].broken = 0;
 
