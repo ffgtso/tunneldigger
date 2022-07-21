@@ -590,7 +590,7 @@ void context_process_control_packet(l2tp_context *ctx)
         // Broker usage information.  We also received this in STATE_STANBY in case we first got
         // a COOKIE, but later also received a USAGE.
         ctx->usage = parse_u16(&buf);
-        syslog(LOG_DEBUG, "[%s:%s] Broker usage: %u\n", ctx->broker_hostname, ctx->broker_port, ctx->usage);
+        syslog(LOG_INFO, "[%s:%s] Broker usage: %u\n", ctx->broker_hostname, ctx->broker_port, ctx->usage);
 
         // Mark the connection as being available for later establishment.
         ctx->state = STATE_STANBDY;
@@ -1101,7 +1101,8 @@ void context_process(l2tp_context *ctx)
   // Transmit packets if needed.
   switch (ctx->state) {
     case STATE_REINIT: {
-      syslog(LOG_DEBUG, "[%s:%s] Broker is in STATE_REINIT.", ctx->broker_hostname, ctx->broker_port);
+      syslog(LOG_DEBUG, "[%s:%s] is in STATE_REINIT.",
+        ctx->broker_hostname, ctx->broker_port);
       if (is_timeout(&ctx->timer_reinit, 2)) {
         syslog(LOG_DEBUG, "[%s:%s] Reinitializing tunnel context.",
           ctx->broker_hostname, ctx->broker_port);
@@ -1115,7 +1116,8 @@ void context_process(l2tp_context *ctx)
       // Deliberate fall-through to STATE_RESOLVING
     }
     case STATE_RESOLVING: {
-      /* syslog(LOG_DEBUG, "[%s:%s] Broker is in STATE_RESOLVING ...", ctx->broker_hostname, ctx->broker_port); */
+      syslog(LOG_DEBUG, "[%s:%s] is in STATE_RESOLVING",
+        ctx->broker_hostname, ctx->broker_port);
       if (ctx->broker_resq == NULL) {
         syslog(LOG_DEBUG, "[%s:%s] Broker's FQDN hasn't been resolved to an IP yet.",
           ctx->broker_hostname, ctx->broker_port);
@@ -1169,13 +1171,13 @@ void context_process(l2tp_context *ctx)
     case STATE_GET_USAGE: {
       if (ctx->timer_usage == 0) {
         // The initial request.  We only ask for usage.
-        syslog(LOG_DEBUG, "[%s:%s] Broker is in STATE_GET_USAGE, sending initial request.",
+        syslog(LOG_DEBUG, "[%s:%s] is in STATE_GET_USAGE, sending initial request.",
           ctx->broker_hostname, ctx->broker_port);
         context_send_usage_request(ctx);
         ctx->timer_usage = timer_now();
       } else if (is_timeout(&ctx->timer_usage, 2)) {
         // *Not* the initial request.  Also ask for cookie, to provide compatibility with old brokers.
-        syslog(LOG_DEBUG, "[%s:%s] Broker is in STATE_GET_USAGE, asking for cookie.",
+        syslog(LOG_DEBUG, "[%s:%s] is in STATE_GET_USAGE, asking for cookie.",
           ctx->broker_hostname, ctx->broker_port);
         context_send_usage_request(ctx);
         context_send_packet(ctx, CONTROL_TYPE_COOKIE, "XXXXXXXX", 8);
@@ -1184,8 +1186,10 @@ void context_process(l2tp_context *ctx)
     }
     case STATE_GET_COOKIE: {
       // Send request for a tasty cookie.
+      syslog(LOG_DEBUG, "[%s:%s] is in STATE_GET_COOKIE",
+        ctx->broker_hostname, ctx->broker_port);
       if (is_timeout(&ctx->timer_cookie, 2)) {
-        syslog(LOG_DEBUG, "[%s:%s] Broker is in STATE_GET_COOKIE, asking for some ...",
+        syslog(LOG_DEBUG, "[%s:%s] Send request for a tasty cookie.",
           ctx->broker_hostname, ctx->broker_port);
         context_send_packet(ctx, CONTROL_TYPE_COOKIE, "XXXXXXXX", 8);
       }
@@ -1193,8 +1197,10 @@ void context_process(l2tp_context *ctx)
     }
     case STATE_GET_TUNNEL: {
       // Send tunnel setup request.
+      syslog(LOG_DEBUG, "[%s:%s] is in STATE_GET_TUNNEL",
+        ctx->broker_hostname, ctx->broker_port);
       if (is_timeout(&ctx->timer_tunnel, 2)) {
-        syslog(LOG_DEBUG, "[%s:%s] Broker is in STATE_GET_TUNNEL, sending request.",
+        syslog(LOG_DEBUG, "[%s:%s] Send tunnel setup request.",
           ctx->broker_hostname, ctx->broker_port);
         context_send_setup_request(ctx);
       }
@@ -1280,10 +1286,10 @@ void context_process(l2tp_context *ctx)
       break;
     }
     case STATE_STANBDY:
-      syslog(LOG_DEBUG, "[%s:%s] Broker is in STATE_STANDBY.", ctx->broker_hostname, ctx->broker_port);
+      syslog(LOG_DEBUG, "[%s:%s] Broker is in STATE_STANDBY", ctx->broker_hostname, ctx->broker_port);
       break; /* -wusel, 2022-07-20: added to distinguish between STANDBY & FAILED */
     case STATE_FAILED: {
-      syslog(LOG_DEBUG, "[%s:%s] Broker is in STATE_FAILED.", ctx->broker_hostname, ctx->broker_port);
+      syslog(LOG_DEBUG, "[%s:%s] Broker is in STATE_FAILED", ctx->broker_hostname, ctx->broker_port);
       break;
     }
   }
@@ -1517,7 +1523,6 @@ int main(int argc, char **argv)
       ready_cnt = 0;
       broker_select(brokers, broker_cnt); // poll from all FDs
       for (i = 0; i < broker_cnt; i++) {
-        syslog(LOG_DEBUG, "[%s:%s] context_process()", brokers[i].address, brokers[i].port);
         context_process(brokers[i].ctx);
       }
 
