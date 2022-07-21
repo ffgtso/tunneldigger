@@ -1104,10 +1104,10 @@ void context_process(l2tp_context *ctx)
       syslog(LOG_DEBUG, "[%s:%s] is in STATE_REINIT.",
         ctx->broker_hostname, ctx->broker_port);
       if (is_timeout(&ctx->timer_reinit, 2)) {
-        syslog(LOG_DEBUG, "[%s:%s] Reinitializing tunnel context.",
+        syslog(LOG_DEBUG, "[%s:%s] reinitializing tunnel context.",
           ctx->broker_hostname, ctx->broker_port);
         if (context_reinitialize(ctx) < 0) {
-          syslog(LOG_ERR, "[%s:%s] Unable to reinitialize the context!",
+          syslog(LOG_ERR, "[%s:%s] unable to reinitialize the context!",
             ctx->broker_hostname, ctx->broker_port);
         }
       }
@@ -1189,7 +1189,7 @@ void context_process(l2tp_context *ctx)
       syslog(LOG_DEBUG, "[%s:%s] is in STATE_GET_COOKIE",
         ctx->broker_hostname, ctx->broker_port);
       if (is_timeout(&ctx->timer_cookie, 2)) {
-        syslog(LOG_DEBUG, "[%s:%s] Send request for a tasty cookie.",
+        syslog(LOG_DEBUG, "[%s:%s] sending request for a tasty cookie ...",
           ctx->broker_hostname, ctx->broker_port);
         context_send_packet(ctx, CONTROL_TYPE_COOKIE, "XXXXXXXX", 8);
       }
@@ -1200,7 +1200,7 @@ void context_process(l2tp_context *ctx)
       syslog(LOG_DEBUG, "[%s:%s] is in STATE_GET_TUNNEL",
         ctx->broker_hostname, ctx->broker_port);
       if (is_timeout(&ctx->timer_tunnel, 2)) {
-        syslog(LOG_DEBUG, "[%s:%s] Send tunnel setup request.",
+        syslog(LOG_DEBUG, "[%s:%s] sending tunnel setup request ...",
           ctx->broker_hostname, ctx->broker_port);
         context_send_setup_request(ctx);
       }
@@ -1286,10 +1286,10 @@ void context_process(l2tp_context *ctx)
       break;
     }
     case STATE_STANBDY:
-      syslog(LOG_DEBUG, "[%s:%s] Broker is in STATE_STANDBY", ctx->broker_hostname, ctx->broker_port);
+      syslog(LOG_DEBUG, "[%s:%s] is in STATE_STANDBY", ctx->broker_hostname, ctx->broker_port);
       break; /* -wusel, 2022-07-20: added to distinguish between STANDBY & FAILED */
     case STATE_FAILED: {
-      syslog(LOG_DEBUG, "[%s:%s] Broker is in STATE_FAILED", ctx->broker_hostname, ctx->broker_port);
+      syslog(LOG_DEBUG, "[%s:%s] is in STATE_FAILED", ctx->broker_hostname, ctx->broker_port);
       break;
     }
   }
@@ -1508,7 +1508,7 @@ int main(int argc, char **argv)
           brokers[i].address, brokers[i].port);
         brokers[i].ctx->state = STATE_FAILED;
       } else {
-        syslog(LOG_DEBUG, "[%s:%s] Broker not flagged as broken, that's good.",
+        syslog(LOG_DEBUG, "[%s:%s] is not flagged as broken, that's good.",
           brokers[i].address, brokers[i].port);
       }
     }
@@ -1527,7 +1527,7 @@ int main(int argc, char **argv)
       }
 
       for (i = 0; i < broker_cnt; i++) {
-        syslog(LOG_DEBUG, "[%s:%s] Broker is%s ready.",
+        syslog(LOG_DEBUG, "[%s:%s] is%s ready.",
           brokers[i].address, brokers[i].port,
           brokers[i].ctx->state == STATE_STANBDY ? "" : " NOT");
         ready_cnt += brokers[i].ctx->state == STATE_STANBDY ? 1 : 0;
